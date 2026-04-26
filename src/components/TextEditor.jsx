@@ -90,18 +90,31 @@ export default function TextEditor() {
 
   const handleCopy = async () => {
     if (!outputText) return;
+    let success = false;
     try {
       await navigator.clipboard.writeText(outputText);
+      success = true;
     } catch {
-      const el = document.createElement('textarea');
-      el.value = outputText;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
+      // Clipboard API unavailable (legacy browser) — fall back to deprecated execCommand
+      try {
+        const el = document.createElement('textarea');
+        el.value = outputText;
+        el.style.position = 'fixed';
+        el.style.opacity  = '0';
+        document.body.appendChild(el);
+        el.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(el);
+      } catch {
+        success = false;
+      }
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      alert('Copy failed. Please select the text manually and press Ctrl+C / Cmd+C.');
+    }
   };
 
   const handleClear = () => {

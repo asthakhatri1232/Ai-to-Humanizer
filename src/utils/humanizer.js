@@ -361,7 +361,7 @@ function applyPassiveVoiceFixes(text, probability) {
       changes++;
       return preserveCase(match, replacement);
     });
-    if (result !== prev) changes++;
+    // Note: changes are already counted inside the replace callback; no extra increment needed
   }
   return { text: result, changes };
 }
@@ -509,16 +509,22 @@ function varySentenceLengths(text, probability) {
 }
 
 // ─── Score calculation ────────────────────────────────────────────────────────
+// Baseline: minimum human score per mode (Light 93%, Standard 96%, Aggressive 98%)
+// CHANGES_PER_WORD_DIVISOR: normalises change count — 1 change per 8 words = ~full boost
+// MAX_SCORE: capped at 99.9% (a 100% score looks suspicious to reviewers)
+// NOISE_RANGE: ±0.15% random jitter so repeated runs produce slightly different scores
+const SCORE_BASELINES   = { light: 93, standard: 96, aggressive: 98 };
+const CHANGES_PER_WORD_DIVISOR = 8;
+const MAX_SCORE         = 99.9;
+const NOISE_RANGE       = 0.3;
+
 function calculateHumanScore(originalWordCount, totalChanges, mode) {
-  const baselines = { light: 93, standard: 96, aggressive: 98 };
-  const baseline = baselines[mode] || 96;
-
-  const changeRatio = Math.min(totalChanges / Math.max(originalWordCount / 8, 1), 1);
-  const boost = changeRatio * (99.9 - baseline);
-  const score = Math.min(baseline + boost, 99.9);
-
-  const noise = (Math.random() - 0.5) * 0.3;
-  return Math.min(Math.max(score + noise, baseline - 0.5), 99.9);
+  const baseline    = SCORE_BASELINES[mode] || SCORE_BASELINES.standard;
+  const changeRatio = Math.min(totalChanges / Math.max(originalWordCount / CHANGES_PER_WORD_DIVISOR, 1), 1);
+  const boost       = changeRatio * (MAX_SCORE - baseline);
+  const score       = Math.min(baseline + boost, MAX_SCORE);
+  const noise       = (Math.random() - 0.5) * NOISE_RANGE;
+  return Math.min(Math.max(score + noise, baseline - 0.5), MAX_SCORE);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
